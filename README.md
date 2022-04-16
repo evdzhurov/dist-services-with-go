@@ -5,8 +5,51 @@ Coding exercises and notes from the book "Distributed Services with Go" by Travi
 
 # Part I - Get Started
 Building basic elements: storage layer, defining data structures.
-## Chapter 1
-Simple JSON over HTTP commit log service.
+## Chapter 1 - Creating an http server with an append-only log service
+A simple JSON over HTTP commit log service.
+
+- Added the **proglog** go module.
+    ```
+    go mod init github.com/evdzhurov/dist-services-with-go/proglog
+    ```
+
+- Added **proglog/internal/server/log.go**
+    - An append-only **Log** data structure with two methods **Append** and **Read**.
+- Added **proglog/internal/server/http.go**
+    - Represents an http server with a **Log** data structure.
+    - The POST "/" http request maps to the **Append** method of the **Log**.
+        - **ProduceRequest** - contains the record that the caller wants appended to the log.
+        - **ProduceResponse** - tells the caller the offset at which the record is stored in the log.
+    - The GET "/" http request maps to the Read method of the **Log**.
+        - **ConsumeRequest** - specifies which records the caller wants to read.
+        - **ConsumeResponse** - sends back the requested records back to the caller.
+    - **handleProduce** implements three steps to append a record to the log:
+        1. Unmarshal the request's JSON body into a struct.
+        2. Run the endpoint logic for the request and produce a result.
+        3. Marshal and write the result to the response.
+    - **handleConsume** is similar to **handleProduce** but implements the logic for reading a record from the log.
+        - Returns **http.StatusNotFound** if the caller asks for a non-existent record.
+- Added **proglog/cmd/server/main.go**
+    - Creates and starts the http server we defined above at [localhost:8080](http://localhost:8080).
+- Test the API
+    ```
+    go run main.go
+    ```
+    - Post records to the log. Since records are byte[] and the encoding/json package encodes byte[] as a base64-encoded string we need to provide a valid base64 string.
+        ```
+        curl -X POST localhost:8080 -d \
+        '{"record": {"value": "TGV0J3MgR28gIzEK"}}'
+        curl -X POST localhost:8080 -d \
+        '{"record": {"value": "TGV0J3MgR28gIzIK"}}'
+        curl -X POST localhost:8080 -d \
+        '{"record": {"value": "TGV0J3MgR28gIzMK"}}'
+        ```
+    - Test if the records can be retrieved from the log by requesting the indices:
+        ```
+        curl -X GET localhost:8080 -d '{"offset": 0}'
+        curl -X GET localhost:8080 -d '{"offset": 1}'
+        curl -X GET localhost:8080 -d '{"offset": 2}'
+        ```  
 
 ## Chapter 2
 Set up protocol buffers, generate data structures, set up automation.
