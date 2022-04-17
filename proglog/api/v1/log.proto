@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package log.v1;
+
+option go_package = "github.com/evdzhurov/dist-services-with-go/proglog/api/v1";
+
+message Record {
+    bytes value = 1;
+    uint64 offset = 2;
+}

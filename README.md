@@ -13,9 +13,9 @@ A simple JSON over HTTP commit log service.
     go mod init github.com/evdzhurov/dist-services-with-go/proglog
     ```
 
-- Added **proglog/internal/server/log.go**
+- Added [proglog/internal/server/log.go](proglog/internal/server/log.go)
     - An append-only **Log** data structure with two methods **Append** and **Read**.
-- Added **proglog/internal/server/http.go**
+- Added [proglog/internal/server/http.go](proglog/internal/server/http.go)
     - Represents an http server with a **Log** data structure.
     - The POST "/" http request maps to the **Append** method of the **Log**.
         - **ProduceRequest** - contains the record that the caller wants appended to the log.
@@ -29,8 +29,8 @@ A simple JSON over HTTP commit log service.
         3. Marshal and write the result to the response.
     - **handleConsume** is similar to **handleProduce** but implements the logic for reading a record from the log.
         - Returns **http.StatusNotFound** if the caller asks for a non-existent record.
-- Added **proglog/cmd/server/main.go**
-    - Creates and starts the http server we defined above at [localhost:8080](http://localhost:8080).
+- Added [proglog/cmd/server/main.go](proglog/cmd/server/main.go)
+    - Creates and starts the http server we defined above at localhost:8080.
 - Test the API
     ```
     go run main.go
@@ -53,6 +53,20 @@ A simple JSON over HTTP commit log service.
 
 ## Chapter 2
 Set up protocol buffers, generate data structures, set up automation.
+
+* Added [proglog/api/v1/log.proto](proglog/api/v1/log.proto)
+    * A protocol buffer description of a log record.
+
+* Install protobuf compiler and go protobuf module
+    ```
+    sudo apt install protobuf-compiler golang-goprotobuf-dev
+
+    go get google.golang.org/protobuf/cmd/protoc-gen-go@latest
+    ```
+
+* Added [proglog/Makefile](proglog/Makefile)
+    * Added a target 'compile-proto' for compiling proto files.
+    * Added a target 'test' for running Go tests.
 
 ## Chapter 3
 Build a commit log library as the core of the service for storing and retrieving data.
