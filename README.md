@@ -88,7 +88,13 @@ Build a commit log library as the core of the service for storing and retrieving
 * Added [proglog/internal/log/store_test.go](proglog/internal/log/store_test.go)
     * Tests the basic functionality of a **store** object - creating a **store**, appending records, reading from and closing the underlying file.
 
+* Added [proglog/internal/log/index.go](proglog/internal/log/index.go)
+    * Defines an **index** object that wraps a writable file and allows references to records to be stored and retrieved.
+    * Index elements are comprised of a relative offset (4 bytes) in a segment of elements and a position (8 bytes) in the storage file.
+    * An **index** is supported by a memory mapped file which requires the file on disk to be resized when the **index** object is created and then the file to be truncated because at a subsequent restart of the service we need to read the last element of the index to be able to continue to append new elements.
 
+* Added [proglog/internal/log/index_test.go](proglog/internal/log/index_test.go)
+    * Tests creation of an **index** object, memory mapping the underlying file, writing elements to the index and reading back the elements.
 
 # Part II - Network
 Make services work over a network.
