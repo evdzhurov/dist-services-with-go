@@ -5,6 +5,8 @@ Coding exercises and notes from the book "Distributed Services with Go" by Travi
 
 # Part I - Get Started
 Building basic elements: storage layer, defining data structures.
+
+[Install latest Go](https://go.dev/doc/install)
 ## Chapter 1 - Creating an http server with an append-only log service
 A simple JSON over HTTP commit log service.
 
@@ -57,12 +59,14 @@ Set up protocol buffers, generate data structures, set up automation.
 * Added [proglog/api/v1/log.proto](proglog/api/v1/log.proto)
     * A protocol buffer description of a log record.
 
-* Install protobuf compiler and go protobuf module
-    ```
-    sudo apt install protobuf-compiler golang-goprotobuf-dev
+* [Install latest protobuf compiler](https://developers.google.com/protocol-buffers/docs/downloads)
+    * Add the compiler executable to PATH
 
-    go get google.golang.org/protobuf/cmd/protoc-gen-go@latest
+* Install the latest go plugin for protobuf compiler
     ```
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+    ```
+    * Add porotoc-gen-go to PATH
 
 * Added [proglog/Makefile](proglog/Makefile)
     * Added a target 'compile-proto' for compiling proto files.
@@ -95,6 +99,12 @@ Build a commit log library as the core of the service for storing and retrieving
 
 * Added [proglog/internal/log/index_test.go](proglog/internal/log/index_test.go)
     * Tests creation of an **index** object, memory mapping the underlying file, writing elements to the index and reading back the elements.
+
+* Added [proglog/internal/log/segment.go](proglog/internal/log/segment.go)
+    * A segment binds a **storage** and **index** object, as well as a configuration on the maximum size of the storage and index files.
+
+* Added [proglog/internal/log/segment_test.go](proglog/internal/log/segment_test.go)
+    * Test that we can add a record to a segment, read back the record and eventually hit the configured max size for both the **store** and **index**.
 
 # Part II - Network
 Make services work over a network.
