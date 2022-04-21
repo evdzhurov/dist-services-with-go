@@ -71,6 +71,25 @@ Set up protocol buffers, generate data structures, set up automation.
 ## Chapter 3
 Build a commit log library as the core of the service for storing and retrieving data.
 
+* Terminology:
+    * Record — the data stored in our log.
+    * Store — the file we store records in.
+    * Index — the file we store index entries in.
+    * Segment — the abstraction that ties a store and an index together.
+    * Log — the abstraction that ties all the segments together.
+
+* Added [proglog/internal/log/store.go](proglog/internal/log/store.go)
+    * Defines a **store** object that wraps a writable file and allows records to be written and read.
+    * **Append** writes a record to the store by prepending 8 bytes for the record size.
+    * **Read** reads at some position in the file - first the number of bytes of the record and then the record itself.
+    * **ReadAt** reads a number of bytes defined by the length of the provided slice at some offset.
+    * **Close** flushes writes to the underlying file of the **store** object and closes the file.
+
+* Added [proglog/internal/log/store_test.go](proglog/internal/log/store_test.go)
+    * Tests the basic functionality of a **store** object - creating a **store**, appending records, reading from and closing the underlying file.
+
+
+
 # Part II - Network
 Make services work over a network.
 
