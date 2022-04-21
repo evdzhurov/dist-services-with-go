@@ -82,6 +82,8 @@ Build a commit log library as the core of the service for storing and retrieving
     * Segment — the abstraction that ties a store and an index together.
     * Log — the abstraction that ties all the segments together.
 
+### Store
+
 * Added [proglog/internal/log/store.go](proglog/internal/log/store.go)
     * Defines a **store** object that wraps a writable file and allows records to be written and read.
     * **Append** writes a record to the store by prepending 8 bytes for the record size.
@@ -92,6 +94,8 @@ Build a commit log library as the core of the service for storing and retrieving
 * Added [proglog/internal/log/store_test.go](proglog/internal/log/store_test.go)
     * Tests the basic functionality of a **store** object - creating a **store**, appending records, reading from and closing the underlying file.
 
+### Index
+
 * Added [proglog/internal/log/index.go](proglog/internal/log/index.go)
     * Defines an **index** object that wraps a writable file and allows references to records to be stored and retrieved.
     * Index elements are comprised of a relative offset (4 bytes) in a segment of elements and a position (8 bytes) in the storage file.
@@ -100,11 +104,29 @@ Build a commit log library as the core of the service for storing and retrieving
 * Added [proglog/internal/log/index_test.go](proglog/internal/log/index_test.go)
     * Tests creation of an **index** object, memory mapping the underlying file, writing elements to the index and reading back the elements.
 
+### Segment
+
 * Added [proglog/internal/log/segment.go](proglog/internal/log/segment.go)
     * A segment binds a **storage** and **index** object, as well as a configuration on the maximum size of the storage and index files.
 
 * Added [proglog/internal/log/segment_test.go](proglog/internal/log/segment_test.go)
     * Test that we can add a record to a segment, read back the record and eventually hit the configured max size for both the **store** and **index**.
+
+### Log
+
+* Added [proglog/internal/log/log.go](proglog/internal/log/log.go)
+    * A **Log** combines a number of segments, the currently active segment, a configuration and the directory name where the segments are placed.
+    * **Append** adds a record to the active segment or creates a new segment to append the record to.
+    * **Read** finds the segment that contains the record for a given offset and returns the record or error if the offset is out of range.
+    * **Close** iterates the segments and closes them.
+    * **Remove** closes the log and removes the files.
+    * **Reset** removes the log and creates a new one.
+    * **LowestOffset** and **HighestOffset** return the offset range in the log.
+    * **Truncate** removes all segments with a highest offset below some value.
+    * **Reader** returns an io.Reader to read the whole log.
+
+* Added [proglog/internal/log/log_test.go](proglog/internal/log/log_test.go)
+    * Test several scenarios for using the **Log** - append and read, out of range read, init existing, reader, truncate.
 
 # Part II - Network
 Make services work over a network.
