@@ -162,6 +162,102 @@ Set up gRPC, define our server and client APIs, build client and server.
 ## Chapter 5
 Secure connections by authenticating with SSL/TLS and using access tokens.
 
+* Install CloudFlare CLIs:
+    ```
+    go install github.com/cloudflare/cfssl/cmd/cfssl@v1.4.1
+    go install github.com/cloudflare/cfssl/cmd/cfssljson@v1.4.1
+    ```
+
+* Added [proglog/test/ca-csr.json](proglog/test/ca-csr.json)
+    * Configuration file used by **cfssl** for our CA's certificate.
+    * Definitions:
+        * **CN** - Common Name
+        * **key** - specifies algorithm and size of signature key
+        * Each entry in **names** should contain at least one (or a combination) of:
+            * **C** - country
+            * **L** - locality or municipality (city)
+            * **ST** - state or province
+            * **O** - organization
+            * **OU** - organizational unit (department)
+
+* Added [proglog/test/ca-config.json](proglog/test/ca-config.json)
+    * Configuration file used to define the CA policy.
+
+* Added [proglog/test/server-csr.json](proglog/test/server-csr.json)
+    * Configuration file used to for the server certificate.
+
+* Update the [proglog/Makefile](proglog/Makefile)
+    * Added the **init** and **gencert** targets
+
+* Added [proglog/internal/config/files.go](proglog/internal/config/files.go)
+    * Define paths to generated TLS certificate files.
+
+* Added [proglog/internal/config/tls.go](proglog/internal/config/tls.go)
+    * Allows different tls configurations:
+        * Client verifies the server's certificate with the client's by setting **RootCA**.
+        * Client verifies the server's certificate and allows the server to verify the client's certificate by setting **RootCA** and **Certificates**.
+        * Server verifies the client's certificate and allows the client to verify the server's certificate by setting **ClientCAs**, **Certificate** and **ClientAuth** mode to **tls.RequireAndVerifyCert**
+
+* Modify [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Use **config.SetupTLSConfig()** to create a client TLS config with **config.CAFile** and connect with credentials.
+    * Use **config.SetupTLSConfig()** to create a server TLS config. Pass credentials to **NewGRPCServer()** (extended to receive **grpc.ServerOption** parameters)
+
+### Mutual (two-way) TLS authentication
+
+* Added [proglog/test/client-csr.json](proglog/test/client-csr.json)
+    * Configuration files used to generate a client certificate needed for mutual (two-way) TLS authentication.
+
+* Modify [proglog/Makefile](proglog/Makefile)
+    * Include client certificate generation in the **gencert** target.
+
+* Modify [proglog/internal/config/files.go](proglog/internal/config/files.go)
+    * Add variables for the client certificate files.
+
+* Modify [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Add **CertFile**, **KeyFile** to **clientTLSConfig**, distinguish **serverTLSConfig** with **Server** flag turned on.
+
+### Authorize with Access Control Lists (ACL)
+
+* Install the ACL library **Casbin**
+    ```
+    go get github.com/casbin/casbin@v1.9.1
+    ```
+* Added [proglog/internal/auth/authorizer.go](proglog/internal/auth/authorizer.go)
+    * Defines the **Authorizer** type with the **Authorize** functionality.
+    * We defer the actual authorization to the **Casbin** library.
+
+* Modify [proglog/Makefile](proglog/Makefile)
+    * In order to test authorization we need at least two clients with different permissions.
+    * Replace the previous client certificate generation with two new client certificates:
+        * root-client
+        * nobody-client
+
+* Run 'make gencert' to generate the new client certificates
+
+* Modify [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Create two separate clients 'root' and 'nobody' instead of just one using the appropriate TLS certificate files.
+        * 'root' is a superuser that can produce and consume.
+        * 'nobody' is not permitted any actions.
+
+* Modify [proglog/internal/config/files.go](proglog/internal/config/files.go)
+    * Add paths for root and nobody client certificates and ACL related files.
+
+* Added [proglog/test/model.conf](proglog/test/model.conf) and [proglog/test/policy.csv](proglog/test/policy.csv)
+    * **Casbin** specific configuration files
+
+* Modify [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Add new function **testUnauthorized** that ascertains lack of permissions on the 'nobody' client.
+
+* Modify [proglog/internal/server/server.go](proglog/internal/server/server.go)
+    * Add the **Authorizer** interface to server **Config**.
+    * Update **Produce()** to authorize the action before performing it.
+    * Update **Consume()** to authorize the action before performing it.
+    * **authenticate()** is an interceptor that reads the subject name out of the TLS certificate and writes it to the RPC context. This is a form of middleware.
+    * Install the **authenticate()** method as a middleware option in **NewGRPCServer()**
+
+* Modify [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Create the **Authorizer** object and add it to the server config.
+
 ## Chapter 6
 Make our service observable by adding logs, metrics and tracing.
 
