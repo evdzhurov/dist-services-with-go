@@ -86,10 +86,10 @@ Build a commit log library as the core of the service for storing and retrieving
 
 * Added [proglog/internal/log/store.go](proglog/internal/log/store.go)
     * Defines a **store** object that wraps a writable file and allows records to be written and read.
-    * **Append** writes a record to the store by prepending 8 bytes for the record size.
-    * **Read** reads at some position in the file - first the number of bytes of the record and then the record itself.
-    * **ReadAt** reads a number of bytes defined by the length of the provided slice at some offset.
-    * **Close** flushes writes to the underlying file of the **store** object and closes the file.
+    * **Append()** writes a record to the store by prepending 8 bytes for the record size.
+    * **Read()** reads at some position in the file - first the number of bytes of the record and then the record itself.
+    * **ReadAt()** reads a number of bytes defined by the length of the provided slice at some offset.
+    * **Close()** flushes writes to the underlying file of the **store** object and closes the file.
 
 * Added [proglog/internal/log/store_test.go](proglog/internal/log/store_test.go)
     * Tests the basic functionality of a **store** object - creating a **store**, appending records, reading from and closing the underlying file.
@@ -116,14 +116,14 @@ Build a commit log library as the core of the service for storing and retrieving
 
 * Added [proglog/internal/log/log.go](proglog/internal/log/log.go)
     * A **Log** combines a number of segments, the currently active segment, a configuration and the directory name where the segments are placed.
-    * **Append** adds a record to the active segment or creates a new segment to append the record to.
-    * **Read** finds the segment that contains the record for a given offset and returns the record or error if the offset is out of range.
-    * **Close** iterates the segments and closes them.
-    * **Remove** closes the log and removes the files.
-    * **Reset** removes the log and creates a new one.
-    * **LowestOffset** and **HighestOffset** return the offset range in the log.
-    * **Truncate** removes all segments with a highest offset below some value.
-    * **Reader** returns an io.Reader to read the whole log.
+    * **Append()** adds a record to the active segment or creates a new segment to append the record to.
+    * **Read()** finds the segment that contains the record for a given offset and returns the record or error if the offset is out of range.
+    * **Close()** iterates the segments and closes them.
+    * **Remove()** closes the log and removes the files.
+    * **Reset()** removes the log and creates a new one.
+    * **LowestOffset()** and **HighestOffset()** return the offset range in the log.
+    * **Truncate()** removes all segments with a highest offset below some value.
+    * **Reader()** returns an io.Reader to read the whole log.
 
 * Added [proglog/internal/log/log_test.go](proglog/internal/log/log_test.go)
     * Test several scenarios for using the **Log** - append and read, out of range read, init existing, reader, truncate.
@@ -133,6 +133,31 @@ Make services work over a network.
 
 ## Chapter 4
 Set up gRPC, define our server and client APIs, build client and server.
+
+* Install gRPC protobuf support
+    ```
+    go install google.golang.org/grpc@v1.32.0
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.0.0
+    ```
+
+* Updated the 'compile-proto' Makefile command to include gRPC
+
+* Added [proglog/internal/server/server.go](proglog/internal/server/server.go)
+    * Contains an implementation of the gRPC service we defined in the file [proglog/api/v1/log.proto](proglog/api/v1/log.proto)
+    * **Produce()** - RPC to add a record to the log.
+    * **Consume()** - RPC to read a record from the log.
+    * **ProduceStream()** - bidirectional streaming RPC.
+    * **ConsumeStream()** - server-side streaming RPC to stream every record starting at some offset.
+    * **CommitLog** - an interface that supports an **Append** and **Read** operations sufficient to represent a commit log. This allows us to decouple the implementation of the log from the implementation of the log service.
+
+* Added [proglog/api/v1/error.go](proglog/api/v1/error.go)
+    * Implement custom error **ErrOffsetOutOfRange** that includes a localized message and an error code.
+
+* Added [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Test different scenarios of a client/server pair:
+        * **testProduceConsume()** - single produce and consume call.
+        * **testConsumePastBoundary()** - consume past the boundary tests producing **ErrOffsetOutOfRange**.
+        * **testProduceConsumeStream()** - test bidirectional produce-consume and server-side continuous consumption.
 
 ## Chapter 5
 Secure connections by authenticating with SSL/TLS and using access tokens.
