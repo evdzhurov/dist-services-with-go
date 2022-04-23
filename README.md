@@ -286,6 +286,37 @@ Make our service distributed, highly available, resilient and scalable.
 ## Chapter 7
 Build discovery into our service and make server instances aware of each other.
 
+* Install Serf
+    ```
+    go get github.com/hashicorp/serf@v0.8.5
+    ```
+
+* Added [proglog/internal/discovery/membership.go](proglog/internal/discovery/membership.go)
+    * **Membership** is a wrapper for Serf to provide discovery and cluster membership to our service.
+    * Serf configurable parameters:
+        * **NodeName** - node's unique identifier across the Serf cluster (hostname is the default).
+        * **BindAddr** and **BindPort** - gossip protocol listener.
+        * **Tags** - tags are shared with other nodes and provide information like the RPC address and if the node is a voter or not.
+        * **EventCh** - receive Sarf events.
+        * **StartJoinAddrs** - list of addresses to other nodes used to initially join a new node to an existing cluster.
+
+* Added [proglog/internal/discovery/membership_test.go](proglog/internal/discovery/membership_test.go)
+    * Sets up a cluster with multiple members and checks the state after joining and subsequently one server leaving.
+    * Each member has a status:
+        * **Alive** - server is present and healthy.
+        * **Leaving** - gracefully leaving the cluster.
+        * **Left** - completed gracefully leaving.
+        * **Failed** - unexpectedly left the cluster.
+
+* Added [proglog/internal/log/replicator.go](proglog/internal/log/replicator.go)
+    * When a server joins the cluster this component will connect to the server and consume repeatedly to produce on the local server.
+
+* Added [proglog/internal/agent/agent.go](proglog/internal/agent/agent.go)
+    * An agent manages all the different components and processes that make up a service -* in our case this is the **Log**, the **gRPC Server**, the **Replicator** and telemetry.
+
+* Added [proglog/internal/agent/agent_test.go](proglog/internal/agent/agent_test.go)
+    * Includes end-to-end service tests.
+
 ## Chapter 8
 Add consensus to coordinate our servers and turn them into a cluster.
 
