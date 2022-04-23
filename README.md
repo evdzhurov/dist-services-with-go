@@ -261,6 +261,25 @@ Secure connections by authenticating with SSL/TLS and using access tokens.
 ## Chapter 6
 Make our service observable by adding logs, metrics and tracing.
 
+* Add OpenCensus (metrics, tracing) and Uber's Zap (logging) dependencies
+    ```
+    go get go.uber.org/zap@v1.10.0
+    go get go.opencensus.io@v0.22.2
+    ```
+
+* Modify [proglog/internal/server/server.go](proglog/internal/server/server.go)
+    * Attach OpenCensus and Zap middleware in **NewGRPCServer()**
+
+* Modify [proglog/internal/server/server_test.go](proglog/internal/server/server_test.go)
+    * Add **TestMain()** which will run before tests to do any necessary setup.
+    * Setup a **telemetryExporter** to write to two files for metrics and tracing. Each test gets its own files.
+
+* Run debug-enabled tests
+    ```
+    cd internal/server
+    go test -v -debug=true
+    ```
+
 # Part III - Distribute
 Make our service distributed, highly available, resilient and scalable.
 
