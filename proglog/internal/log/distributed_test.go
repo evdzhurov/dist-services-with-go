@@ -55,6 +55,7 @@ func TestMultipleNodes(t *testing.T) {
 		logs = append(logs, l)
 	}
 
+	// Test produce/consume
 	records := []*api.Record{
 		{Value: []byte("first")},
 		{Value: []byte("second")},
@@ -76,9 +77,27 @@ func TestMultipleNodes(t *testing.T) {
 			return true
 		}, 500*time.Millisecond, 50*time.Millisecond)
 	}
-	err := logs[0].Leave("1")
+
+	// DistributedLog 0 is leader (from 3 initial servers)
+	servers, err := logs[0].GetServers()
 	require.NoError(t, err)
+	require.Equal(t, 3, len(servers))
+	require.True(t, servers[0].IsLeader)
+	require.False(t, servers[1].IsLeader)
+	require.False(t, servers[2].IsLeader)
+
+	err = logs[0].Leave("1")
+	require.NoError(t, err)
+
 	time.Sleep(50 * time.Millisecond)
+
+	// DistributedLog 0 is leader (from 2 servers left)
+	servers, err = logs[0].GetServers()
+	require.NoError(t, err)
+	require.Equal(t, 2, len(servers))
+	require.True(t, servers[0].IsLeader)
+	require.False(t, servers[1].IsLeader)
+
 	off, err := logs[0].Append(&api.Record{
 		Value: []byte("third"),
 	})

@@ -392,6 +392,61 @@ Many distributed services that use Raft multiplex Raft with other services like 
 ## Chapter 9
 Add discovery in our gRPC clients so they can connect to the server with client-side load balancing.
 
+* Enable clients to:
+    * Discover servers in the cluster.
+    * Direct produce calls to leaders and consume calls to followers.
+    * Balance consume calls between followers.
+
+* Load-balancing strategies:
+    * Server proxy - client sends a request to a load balancer that knows about back-end servers and proxies the request. This is the most common approach as clients cannot be trusted.
+    * External load balancing - client queries an external load-balancing service and receives a response on what server to use. Adds operational burden.
+    * Client-side balancing - client queries a service registry to learn about the servers, picks a server and sends its RPC directly to it. Suitable when the clients are trusted to do the right thing.
+
+### Make Servers Discoverable
+
+* Modify [proglog/api/v1/log.proto](proglog/api/v1/log.proto)
+    * Add the **GetServers(GetServersRequest)** endpoint.
+
+* Modify [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * Add function to **DistributedLog** to get Raft's server data.
+
+* Modify [proglog/internal/log/distributed_test.go](proglog/internal/log/distributed_test.go)
+    * Add test for the expected Raft server configuration before and after the initial leader leaves the cluster.
+
+* Modify [proglog/internal/server/server.go](proglog/internal/server/server.go)
+    * Update our **grpcServer** with the **Serverer** interface that knows how to get info about the servers in the distributed system.
+
+* Modify [proglog/internal/agent/agent.go](proglog/internal/agent/agent.go)
+    * Designate the **DistributedLog** which uses Raft as the **Serverer** in the **serverConfig**.
+
+### Resolve the Servers
+
+* Added [proglog/internal/loadbalance/resolver.go](proglog/internal/loadbalance/resolver.go)
+    * Add the **Resolver** type that will handle both gRPC's builder pattern and actual implementation.
+    * A gRPC resolver builder comprises of two methods:
+        * **Build()** - receives the data needed to build a resolver that can discover the servers and the client connections that will be updated. **Build()** sets up a connection required to call the **GetServers()** API.
+        * **Scheme()** - returns the resolver's scheme identifier.
+    * A gRPC resolver comprises of two methods:
+        * **ResolveNow()** - resolve the target, discover the servers and update the client connection with the servers.
+        * **Close()** - close the resolver's connection.
+
+* Added [proglog/internal/loadbalance/resolver_test.go](proglog/internal/loadbalance/resolver_test.go)
+    * Test that our resolver fetches the mockup server addresses and updates the client connection with the results.
+
+### Route and Balance Requests with Pickers
+In the gRPC architecture pickers perform request-routing logic.
+
+* Added [proglog/internal/loadbalance/picker.go](proglog/internal/loadbalance/picker.go)
+    * Pickers use the builder pattern just like resolvers.
+    * A picker implements the **Pick(balancer.PickInfo)** method. gRPC provides a **balancer.PickInfo** with the RPC's name and context to help choose the subconnection to use.
+
+* Added [proglog/internal/loadbalance/picker_test.go](proglog/internal/loadbalance/picker_test.go)
+    * **TestPickerNoSubConnAvailable()** tests that initially a picker returns **balancer.ErrNoSubConnAvailable** before the resolver has discovered any servers.
+    * **TestPickerProducesToLeader()** tests that the leader subconnection is picked for 'produce' requests.
+    * **TestPickerConsumesFromFollowers()** tests that a follower subconnection is picked in round-robin scheduling for 'consume' requests.
+
+### Test Discovery and Balance End-to-End
+
 # Part IV - Deploy
 Deploy our service and make it live.
 
