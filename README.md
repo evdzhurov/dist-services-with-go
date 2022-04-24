@@ -86,7 +86,7 @@ Build a commit log library as the core of the service for storing and retrieving
 
 * Added [proglog/internal/log/store.go](proglog/internal/log/store.go)
     * Defines a **store** object that wraps a writable file and allows records to be written and read.
-    * **Append()** writes a record to the store by prepending 8 bytes for the record size.
+    * **Append()** writes a record to the store by pre-pending 8 bytes for the record size.
     * **Read()** reads at some position in the file - first the number of bytes of the record and then the record itself.
     * **ReadAt()** reads a number of bytes defined by the length of the provided slice at some offset.
     * **Close()** flushes writes to the underlying file of the **store** object and closes the file.
@@ -319,6 +319,75 @@ Build discovery into our service and make server instances aware of each other.
 
 ## Chapter 8
 Add consensus to coordinate our servers and turn them into a cluster.
+
+* Install Raft
+    ```
+    go get github.com/hashicorp/raft@v1.1.1
+
+    # use etcd's fork of Ben Johnson's Bolt key/value store,
+    # which includes fixes for Go 1.14+
+    go mod edit -replace github.com/hashicorp/raft-boltdb=\
+    github.com/travisjeffery/raft-boltdb@v1.0.0
+    ```
+
+* Added [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * A Raft instance comprises of:
+        * A finite-state machine that executes Raft commands.
+        * A log store where Raft stores the commands.
+        * A stable store where Raft stores the cluster configuration.
+        * A snapshot store where Raft stores compact snapshots of its data.
+        * A transport that Raft uses to connect to other peers.
+    * A server is bootstrapped by configuring itself as the only voter, wait for its leader term, and then add other servers that don't bootstrap.
+
+* Modify [proglog/internal/log/config.go](proglog/internal/log/config.go)
+    * Add Raft section to the config.
+
+* Modify [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * Implement the Log API (Append, Read) in **DistributedLog** so we can use it instead of just **Log**.
+    * Implement a FSM with the following methods:
+        * **Apply(record *raft.Log)** - invoked by Raft after committing a log entry.
+        * **Snapshot()** - called periodically by Raft to produce a compacted log.
+        * **Restore(io.ReadCloser)** - called by Raft to restore a FSM from a snapshot.
+    * Use our own **Log** as Raft's **LogStore**.
+
+* Modify [proglog/api/v1/log.proto](proglog/api/v1/log.proto)
+    * Include **term** and **type** fields needed by Raft to implement a log.
+    * Compile changes with 'make compile-proto'
+
+* Modify [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * Implement the **StreamLayer** interface to provide a low-level stream abstraction in Raft.
+
+### Discovery Integration
+
+* Modify [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * When a server joins the service add it as a Raft voter.
+    * Changing the cluster should not be possible on non-leader nodes.
+
+* Modify [proglog/internal/discovery/membership.go](proglog/internal/discovery/membership.go)
+    * Update **logError** to expect errors related to Raft leadership on non-leader nodes.
+
+* Modify [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * Add **WaitForLeader()** - blocks until the cluster has elected a leader or times out. Useful for running tests.
+
+### Test the Distributed Log
+
+* Added [proglog/internal/log/distributed_test.go](proglog/internal/log/distributed_test.go)
+    * Test with a 3-server cluster.
+    * The default Raft timeout config is shortened to allow quicker leader election.
+    * The first server bootstraps the cluster, becomes the leader, and adds the other two servers.
+    * Test replication by appending some records through our leader and check that Raft replicated the records to the followers eventually.
+
+### Multiplex to Run Multiple Services on One Port
+Many distributed services that use Raft multiplex Raft with other services like an RPC service.
+
+* Added [proglog/internal/agent/agent.go](proglog/internal/agent/agent.go)
+    * Update **Agent** to use the **DistributedLog**, remove **replicator** and add a **cmux.CMux**.
+    * Add the **Bootstrap** flag to **Config**.
+    * Add a new setup function for the multiplexer.
+    * Remove any replicator code (we don't need it anymore now that we have Raft).
+
+* Modify [proglog/internal/agent/agent_test.go](proglog/internal/agent/agent_test.go)
+    * Update the **Agent** test to show that with Raft the leader does not replicate from its followers.
 
 ## Chapter 9
 Add discovery in our gRPC clients so they can connect to the server with client-side load balancing.
