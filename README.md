@@ -445,13 +445,156 @@ In the gRPC architecture pickers perform request-routing logic.
     * **TestPickerProducesToLeader()** tests that the leader subconnection is picked for 'produce' requests.
     * **TestPickerConsumesFromFollowers()** tests that a follower subconnection is picked in round-robin scheduling for 'consume' requests.
 
-### Test Discovery and Balance End-to-End
+* Modify [proglog/internal/agent/agent_test.go](proglog/internal/agent/agent_test.go)
+    * Test discovery and load balance end-to-end.
 
 # Part IV - Deploy
 Deploy our service and make it live.
 
 ## Chapter 10
 Set up Kubernetes locally and run a cluster on your machine. Prepare to deploy on the Cloud.
+
+* Install kubectl
+    * https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+    ```
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)\
+    /bin/linux/amd64/kubectl"
+    chmod +x ./kubectl
+    mv ./kubectl /usr/local/bin/kubectl
+    ```
+
+* Install Kind (Kubernetes in Docker) tool.
+    ```
+    curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
+    chmod +x ./kind
+    mv ./kind /usr/local/bin/kind
+    ```
+
+* Install Docker
+    * https://docs.docker.com/get-docker/
+
+* Create a Kind cluster
+    ```
+    kind create cluster
+    ```
+    * Verify cluster
+        ```
+        kubectl cluster-info
+        ```
+
+### Write an Agent Command-Line Interface
+
+* Added [proglog/cmd/proglog/main.go](proglog/cmd/proglog/main.go)
+    * Add CLI commands and flags needed to run the **Agent**.
+    * Create an **Agent** object and run it until a SIGINT or SIGTERM signal is received.
+
+### Build Docker Image
+
+* Added [proglog/cmd/proglog/Dockerfile](proglog/cmd/proglog/Dockerfile)
+    * A two-stage build that compiles (statically) the Agent CLI and puts it on a minimal scratch image.
+
+* Modify [proglog/Makefile](proglog/Makefile)
+    * Add a target 'build-docker' to build the docker image.
+
+* Build the image and load it into our Kind cluster.
+    ```
+    make build-docker
+    kind load docker-image github.com/evdzhurov/dist-services-with-go/proglog:0.0.1
+    ```
+
+### Configure and Deploy the Service With Helm
+* Helm definitions:
+    * Helm is the package manager for Kubernetes.
+    * Helm packages are called **charts**.
+    * **Charts** define all resources needed to run a service in a Kubernetes cluster.
+    * A **release** is an instance of running a **chart**.
+    * **Repositories** are where you share **charts**.
+
+* Install Helm
+    ```
+    curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+    ```
+
+* Explore Helm by installing a chart for nginx
+    * Install nginx
+        ```
+        helm repo add bitnami https://charts.bitnami.com/bitnami
+        helm install my-nginx bitnami/nginx
+        ```
+    * List releases
+        ```
+        helm list
+        ```
+    * Test nginx
+        ```
+        ./test-helm-nginx.sh
+        ```
+    * Uninstall nginx
+        ```
+        helm uninstall my-nginx
+        ```
+
+* Create a Helm chart for our service
+    * Create the helm chart
+        ```
+        mkdir deploy && cd deploy
+        helm create proglog
+        ```
+    * Check the resources Helm would use with the example chart
+        ```
+        helm template proglog
+        ```
+    * Remove example templates
+        ```
+        rm proglog/templates/**/*.yaml proglog/templates/NOTES.txt
+        ```
+    * Added [proglog/deploy/proglog/templates/statefulset.yaml](proglog/deploy/proglog/templates/statefulset.yaml)
+        * Our StatefulSet has a **dataDir** PresistentVolumeClaim - this claim requests storage for the cluster which can be fulfilled by Kubernetes by a local disk, cloud storage, etc. depending on the configuration.
+
+### Container Probes and gRPC Health Check
+
+* Kubernetes probes:
+    * Liveness probes - signal that the container is live.
+    * Readiness probes - check that the container is ready to accept traffic.
+    * Startup probes - signal when the container app has started and probing for liveness and readiness can begin.
+
+* Modify [proglog/internal/server/server.go](proglog/internal/server/server.go)
+    * Export the gRPC health check service.
+
+* Modify [proglog/deploy/proglog/templates/statefulset.yaml](proglog/deploy/proglog/templates/statefulset.yaml)
+    * Define the 'liveness' and 'readiness' probes.
+
+* Modify [proglog/Dockerfile](proglog/Dockerfile)
+    * Install the gRPC health probe binary.
+
+### Kubernetes Services
+
+* Added [proglog/deploy/proglog/templates/service.yaml](proglog/deploy/proglog/templates/service.yaml)
+    * Define a 'headless' service used when the distributed system has its own means of service discovery.
+
+### Advertise Raft on the Fully Qualified Domain Name
+
+* Modify [proglog/internal/log/config.go](proglog/internal/log/config.go)
+    * Add the **BindAddr** to the config.
+
+* Modify [proglog/internal/log/distributed.go](proglog/internal/log/distributed.go)
+    * Raft servers now use the configured **BindAddr**.
+
+* Modify [proglog/internal/log/distributed_test.go](proglog/internal/log/distributed_test.go)
+    * Change the test config to set the **BindAddr**.
+
+* Modify [proglog/internal/agent/agent.go](proglog/internal/agent/agent.go)
+    * Change **Agent** to set **BindAddr**.
+
+### Install the Helm Chart
+
+* Modify [proglog/deploy/proglog/values.yaml](proglog/deploy/proglog/values.yaml)
+    * Replace with proglog specific values.
+
+* Install the chart:
+    ```
+    helm install proglog deploy/proglog
+    ```
 
 ## Chapter 11
 Create a Kubernetes cluster on Google Cloud's Kubernetes Engine and deploy our service to the Cloud.

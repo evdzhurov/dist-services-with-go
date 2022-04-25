@@ -1,6 +1,7 @@
 .PHONY: help
 .DEFAULT_GOAL := help
 
+TAG ?= 0.0.1
 CONFIG_PATH=${HOME}/.proglog/
 
 .PHONY: init
@@ -58,3 +59,7 @@ $(CONFIG_PATH)/policy.csv:
 .PHONY: test
 test: $(CONFIG_PATH)/policy.csv $(CONFIG_PATH)/model.conf ## Run tests
 	go test -race ./...
+
+.PHONY: build-docker
+build-docker: ## Build docker image with the Agent CLI
+	docker build -t github.com/evdzhurov/dist-services-with-go/proglog:$(TAG) .
