@@ -71,15 +71,29 @@ func (l *Log) setup() error {
 }
 
 func (l *Log) Append(record *api.Record) (uint64, error) {
+
+	// HighestOffset() acquires the lock
+	// call here to avoid recursive locking (not permitted by sync.RWMutex)
+	highestOffset, err := l.HighestOffset()
+	if err != nil {
+		return 0, err
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	if l.activeSegment.IsMaxed() {
+		err = l.newSegment(highestOffset + 1)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	off, err := l.activeSegment.Append(record)
 	if err != nil {
 		return 0, err
 	}
-	if l.activeSegment.IsMaxed() {
-		err = l.newSegment(off + 1)
-	}
+
 	return off, err
 }
 

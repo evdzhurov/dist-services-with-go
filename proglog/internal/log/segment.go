@@ -90,7 +90,7 @@ func (s *segment) Read(off uint64) (*api.Record, error) {
 
 func (s *segment) IsMaxed() bool {
 	return s.store.size >= s.config.Segment.MaxStoreBytes ||
-		s.index.size >= s.config.Segment.MaxIndexBytes
+		s.index.size >= s.config.Segment.MaxIndexBytes || s.index.IsMaxed()
 }
 
 func (s *segment) Remove() error {

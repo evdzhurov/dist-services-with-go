@@ -51,17 +51,15 @@ spec:
         # probes...
         readinessProbe:
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.rpcPort }}"]
+            command: ["/bin/grpc_health_probe", "-addr=$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.rpcPort}}"]
           initialDelaySeconds: 10
         livenessProbe:
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.rpcPort }}"]
+            command: ["/bin/grpc_health_probe", "-addr=$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.rpcPort}}"]
           initialDelaySeconds: 10
         volumeMounts:
         - name: datadir
           mountPath: /var/run/proglog
-
-      
   volumeClaimTemplates:
   - metadata:
       name: datadir

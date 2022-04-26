@@ -43,6 +43,10 @@ func newIndex(f *os.File, c Config) (*index, error) {
 	return idx, nil
 }
 
+func (i *index) IsMaxed() bool {
+	return uint64(len(i.mmap)) < i.size+entWidth
+}
+
 func (i *index) Close() error {
 	if err := i.mmap.Sync(gommap.MS_SYNC); err != nil {
 		return err
@@ -75,7 +79,7 @@ func (i *index) Read(in int64) (out uint32, pos uint64, err error) {
 }
 
 func (i *index) Write(off uint32, pos uint64) error {
-	if uint64(len(i.mmap)) < i.size+entWidth {
+	if i.IsMaxed() {
 		return io.EOF
 	}
 	enc.PutUint32(i.mmap[i.size:i.size+offWidth], off)
