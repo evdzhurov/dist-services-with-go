@@ -596,5 +596,20 @@ Set up Kubernetes locally and run a cluster on your machine. Prepare to deploy o
     helm install proglog deploy/proglog
     ```
 
+### Request the service from a program running outside the kubernetes cluster
+
+* Added [proglog/cmd/getservers/main.go](proglog/cmd/getservers/main.go)
+    * Simple program to request the server status
+
+* Forward a pod port to a port on our machine
+    ```
+    kubectl port-forward pod/proglog-0 8400
+    ```
+
+* Run the getservers command
+    ```
+    go run cmd/getservers/main.go
+    ```
+
 ## Chapter 11
 Create a Kubernetes cluster on Google Cloud's Kubernetes Engine and deploy our service to the Cloud.

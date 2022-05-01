@@ -27,9 +27,6 @@ spec:
               cat > /var/run/proglog/config.yaml <<EOD
               data-dir: /var/run/proglog/data
               rpc-port: {{.Values.rpcPort}}
-              # Make sure the following three key-values are on one line each in
-              # your code. I split them across multiple lines to fit them in
-              # for the book.
               bind-addr: "$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.serfPort}}"
               bootstrap: $([ $ID = 0 ] && echo true || echo false)
               $([ $ID != 0 ] && echo 'start-join-addrs: "proglog-0.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.serfPort}}"')
@@ -51,11 +48,19 @@ spec:
         # probes...
         readinessProbe:
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.rpcPort}}"]
+            command:
+            - /bin/sh
+            - -c
+            - |-
+              /bin/grpc_health_probe -addr=$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.rpcPort}}
           initialDelaySeconds: 10
         livenessProbe:
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.rpcPort}}"]
+            command:
+            - /bin/sh
+            - -c
+            - |-
+              /bin/grpc_health_probe -addr=$HOSTNAME.proglog.{{.Release.Namespace}}.svc.cluster.local:{{.Values.rpcPort}}
           initialDelaySeconds: 10
         volumeMounts:
         - name: datadir
