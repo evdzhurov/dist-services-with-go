@@ -613,3 +613,64 @@ Set up Kubernetes locally and run a cluster on your machine. Prepare to deploy o
 
 ## Chapter 11
 Create a Kubernetes cluster on Google Cloud's Kubernetes Engine and deploy our service to the Cloud.
+
+* Create a [Google Cloud Platform Account](https://cloud.google.com)
+* Create a [Kubernetes cluster](https://console.cloud.google.com/kubernetes)
+* Install the [latest Cloud SDK](https://cloud.google.com/sdk/docs/downloads-versioned-archives)
+
+### Push the services image to Google's Container Regestry (GCR)
+
+* Set the Google Cloud project
+    ```
+    gcloud auth login
+    PROJECT_ID=$(gcloud projects list | tail -n 1 | cut -d' ' -f1)
+    gcloud config set project $PROJECT_ID
+    ```
+
+* Push the image to GCR
+    ```
+    gcloud auth configure-docker
+    docker tag github.com/evdzhurov/dist-services-with-go/proglog:0.0.1 gcr.io/$PROJECT_ID/proglog:0.0.1
+    docker push gcr.io/$PROJECT_ID/proglog:0.0.1
+    ```
+
+* Configure kubectl
+    ```
+    gcloud container clusters get-credentials proglog --zone europe-central2-a
+    ```
+
+### Create Custom Controllers With Metacontroller
+
+Metacontroller is a Kubernetes add-on that makes it easy to write and deploy custom controllers with simple scripts.
+
+* Use Helm to install Metacontroller
+    ```
+    cd deploy
+    helm create metacontroller
+    rm metacontroller/templates/*.yaml metacontroller/templates/NOTES.txt metacontroller/values.yaml
+    MC_URL=https://raw.githubusercontent.com/GoogleCloudPlatform/metacontroller/master/manifests
+    curl -L $MC_URL/metacontroller-rbac.yaml > metacontroller/templates/metacontroller-rbac.yaml
+    curl -L $MC_URL/metacontroller.yaml > metacontroller/templates/metacontroller.yaml
+
+    kubectl create namespace metacontroller
+    helm install metacontroller metacontroller
+    ```
+
+### Add Service-per-Pod Load Balancer Hooks
+
+* Added [proglog/deploy/proglog/templates/service-per-pod.yaml](proglog/deploy/proglog/templates/service-per-pod.yaml)
+    * Decorates every StatefulSet with the **service-per-pod-label** and **service-per-pod-ports** annotations.
+
+* Added [proglog/deploy/proglog/hooks/create-service-per-pod.jsonnet](proglog/deploy/proglog/hooks/create-service-per-pod.jsonnet)
+
+* Added [proglog/deploy/proglog/hooks/delete-service-per-pod.jsonnet](proglog/deploy/proglog/hooks/delete-service-per-pod.jsonnet)
+
+* Modify [proglog/deploy/proglog/templates/statefulset.yaml](proglog/deploy/proglog/templates/statefulset.yaml)
+    * Add the annotations.
+
+### Deploy to the Internet
+
+```
+helm install proglog proglog --set image.repository=gcr.io/$PROJECT_ID/proglog --set service.lb=true
+./test-getservers-cloud.sh
+```
